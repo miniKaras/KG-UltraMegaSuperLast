@@ -8,37 +8,42 @@ public class Polygon {
     private ArrayList<Integer> textureVertexIndices;
     private ArrayList<Integer> normalIndices;
 
-
     public Polygon() {
-        vertexIndices = new ArrayList<Integer>();
-        textureVertexIndices = new ArrayList<Integer>();
-        normalIndices = new ArrayList<Integer>();
+        this.vertexIndices = new ArrayList<>();
+        this.textureVertexIndices = new ArrayList<>();
+        this.normalIndices = new ArrayList<>();
     }
 
     public void setVertexIndices(ArrayList<Integer> vertexIndices) {
-        assert vertexIndices.size() >= 3;
+        if (vertexIndices.size() < 3) {
+            throw new IllegalArgumentException("A polygon must have at least 3 vertex indices.");
+        }
         this.vertexIndices = vertexIndices;
     }
 
     public void setTextureVertexIndices(ArrayList<Integer> textureVertexIndices) {
-        assert textureVertexIndices.size() >= 3;
+        if (textureVertexIndices.size() < 3) {
+            throw new IllegalArgumentException("A polygon must have at least 3 texture vertex indices.");
+        }
         this.textureVertexIndices = textureVertexIndices;
     }
 
     public void setNormalIndices(ArrayList<Integer> normalIndices) {
-        assert normalIndices.size() >= 3;
+        if (normalIndices.size() < 3) {
+            throw new IllegalArgumentException("A polygon must have at least 3 normal indices.");
+        }
         this.normalIndices = normalIndices;
     }
 
     public ArrayList<Integer> getVertexIndices() {
-        return vertexIndices;
+        return new ArrayList<>(vertexIndices);
     }
 
     public ArrayList<Integer> getTextureVertexIndices() {
-        return textureVertexIndices;
+        return new ArrayList<>(textureVertexIndices);
     }
 
     public ArrayList<Integer> getNormalIndices() {
-        return normalIndices;
+        return new ArrayList<>(normalIndices);
     }
 }
