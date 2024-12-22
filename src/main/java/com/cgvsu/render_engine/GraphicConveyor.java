@@ -32,7 +32,6 @@ public class GraphicConveyor {
         right.normalize();
         newUp.normalize();
 
-        // Transposed view matrix
         float[] matrix = new float[]{
                 right.x, newUp.x, forward.x, 0,
                 right.y, newUp.y, forward.y, 0,
