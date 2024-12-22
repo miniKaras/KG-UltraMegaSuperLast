@@ -9,46 +9,41 @@ import java.util.List;
 public class Triangulation {
 
     public static List<Polygon> triangulate(List<Polygon> polygons) {
-        int vertexCount = calculateVertexCount(polygons);
+        int vertexCount = 0;
+        for (Polygon polygon : polygons) {
+            vertexCount += polygon.getVertexIndices().size() - 2;
+        }
+
         List<Polygon> result = new ArrayList<>(vertexCount);
 
         for (Polygon polygon : polygons) {
-            processPolygon(polygon, result);
+            for (int vertex = 1; vertex < polygon.getVertexIndices().size() - 1; vertex++) {
+                Polygon polygonResult = new Polygon();
+
+                ArrayList<Integer> vertexIndices = (ArrayList<Integer>) getVertexes(
+                        polygon.getVertexIndices(),
+                        0, vertex, vertex + 1);
+                polygonResult.setVertexIndices(vertexIndices);
+
+                if (!polygon.getTextureVertexIndices().isEmpty()) {
+                    ArrayList<Integer> textureVertexIndices = (ArrayList<Integer>) getVertexes(
+                            polygon.getTextureVertexIndices(),
+                            0, vertex, vertex + 1);
+                    polygonResult.setTextureVertexIndices(textureVertexIndices);
+                }
+
+                if (!polygon.getNormalIndices().isEmpty()) {
+                    ArrayList<Integer> normalIndices = (ArrayList<Integer>) getVertexes(
+                            polygon.getNormalIndices(),
+                            0, vertex, vertex + 1);
+                    polygonResult.setNormalIndices(normalIndices);
+                }
+
+                result.add(polygonResult);
+            }
         }
 
         return result;
-    }
-
-    private static int calculateVertexCount(List<Polygon> polygons) {
-        int count = 0;
-        for (Polygon polygon : polygons) {
-            count += polygon.getVertexIndices().size() - 2;
-        }
-        return count;
-    }
-
-    private static void processPolygon(Polygon polygon, List<Polygon> result) {
-        for (int vertex = 1; vertex < polygon.getVertexIndices().size() - 1; vertex++) {
-            Polygon polygonResult = new Polygon();
-
-            polygonResult.setVertexIndices(
-                    (ArrayList<Integer>) getVertexes(polygon.getVertexIndices(), 0, vertex, vertex + 1)
-            );
-
-            if (!polygon.getTextureVertexIndices().isEmpty()) {
-                polygonResult.setTextureVertexIndices(
-                        (ArrayList<Integer>) getVertexes(polygon.getTextureVertexIndices(), 0, vertex, vertex + 1)
-                );
-            }
-
-            if (!polygon.getNormalIndices().isEmpty()) {
-                polygonResult.setNormalIndices(
-                        (ArrayList<Integer>) getVertexes(polygon.getNormalIndices(), 0, vertex, vertex + 1)
-                );
-            }
-
-            result.add(polygonResult);
-        }
     }
 
     public static List<Integer> getVertexes(List<Integer> vertexes, int v1, int v2, int v3) {

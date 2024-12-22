@@ -1,10 +1,21 @@
 package com.cgvsu.render_engine;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import com.cgvsu.checkbox.Greed;
 import com.cgvsu.math.Vector3f;
+import com.cgvsu.math.Vector2f;
+import com.cgvsu.rasterization.TriangleRasterization;
+import com.cgvsu.texture.ImageToText;
 import javafx.scene.canvas.GraphicsContext;
+
 import javax.vecmath.*;
+
 import com.cgvsu.model.Model;
+import javafx.scene.paint.Color;
+
 import static com.cgvsu.render_engine.GraphicConveyor.*;
 
 public class RenderEngine {
@@ -12,9 +23,13 @@ public class RenderEngine {
     public static void render(
             final GraphicsContext graphicsContext,
             final Camera camera,
-            final Model mesh,
+            final List<Model> meshes,
             final int width,
             final int height) {
+        double[][] ZBuffer = new double[width][height];
+        for (double[] longs : ZBuffer) {
+            Arrays.fill(longs, Double.MAX_VALUE);
+        }
 
         Matrix4f modelMatrix = rotateScaleTranslate();
         Matrix4f viewMatrix = camera.getViewMatrix();
@@ -24,59 +39,59 @@ public class RenderEngine {
         modelViewProjectionMatrix.mul(viewMatrix);
         modelViewProjectionMatrix.mul(projectionMatrix);
 
-        for (int polygonInd = 0; polygonInd < mesh.polygons.size(); ++polygonInd) {
-            renderPolygon(graphicsContext, mesh, modelViewProjectionMatrix, polygonInd, width, height);
-        }
-    }
+        for (Model mesh : meshes) {
+            if (mesh.pathTexture != null && mesh.imageToText == null) {
+                mesh.imageToText = new ImageToText();
+                mesh.imageToText.loadImage(mesh.pathTexture);
+            }
 
-    private static void renderPolygon(
-            final GraphicsContext graphicsContext,
-            final Model mesh,
-            final Matrix4f modelViewProjectionMatrix,
-            final int polygonInd,
-            final int width,
-            final int height) {
+            final int nPolygons = mesh.polygons.size();
 
-        final int nVerticesInPolygon = mesh.polygons.get(polygonInd).getVertexIndices().size();
-        ArrayList<Point2f> resultPoints = new ArrayList<>();
+            for (int polygonInd = 0; polygonInd < nPolygons; ++polygonInd) {
+                final int nVerticesInPolygon = mesh.polygons.get(polygonInd).getVertexIndices().size();
+                javax.vecmath.Vector3f v;
+                double[] vz = new double[nVerticesInPolygon];
+                Vector3f[] normals = new Vector3f[3];
+                Vector2f[] textures = new Vector2f[3];
 
-        for (int vertexInPolygonInd = 0; vertexInPolygonInd < nVerticesInPolygon; ++vertexInPolygonInd) {
-            Vector3f vertex = mesh.vertices.get(mesh.polygons.get(polygonInd).getVertexIndices().get(vertexInPolygonInd));
-            javax.vecmath.Vector3f vertexVecmath = new javax.vecmath.Vector3f(vertex.x, vertex.y, vertex.z);
+                ArrayList<Point2f> resultPoints = new ArrayList<>();
 
-            Point2f resultPoint = vertexToPoint(
-                    multiplyMatrix4ByVector3(modelViewProjectionMatrix, vertexVecmath),
-                    width,
-                    height
-            );
-            resultPoints.add(resultPoint);
-        }
+                for (int vertexInPolygonInd = 0; vertexInPolygonInd < nVerticesInPolygon; ++vertexInPolygonInd) {
+                    Vector3f vertex = mesh.vertices.get(mesh.polygons.get(polygonInd).getVertexIndices().get(vertexInPolygonInd));
+                    normals[vertexInPolygonInd] = mesh.normals.get(mesh.polygons.get(polygonInd).getVertexIndices().get(vertexInPolygonInd));
 
-        drawPolygonEdges(graphicsContext, resultPoints);
-    }
+                    if (mesh.pathTexture != null) {
+                        textures[vertexInPolygonInd] = mesh.textureVertices.get(mesh.polygons.get(polygonInd).getTextureVertexIndices().get(vertexInPolygonInd));
+                    }
 
-    private static void drawPolygonEdges(
-            final GraphicsContext graphicsContext,
-            final ArrayList<Point2f> resultPoints) {
+                    javax.vecmath.Vector3f vertexVecmath = new javax.vecmath.Vector3f(vertex.x, vertex.y, vertex.z);
+                    v = multiplyMatrix4ByVector3(modelViewProjectionMatrix, vertexVecmath);
+                    vz[vertexInPolygonInd] = v.z;
+                    Point2f resultPoint = vertexToPoint(v, width, height);
+                    resultPoints.add(resultPoint);
+                }
 
-        final int nVerticesInPolygon = resultPoints.size();
+                int[] coorX = new int[]{(int) resultPoints.get(0).x, (int) resultPoints.get(1).x, (int) resultPoints.get(2).x};
+                int[] coorY = new int[]{(int) resultPoints.get(0).y, (int) resultPoints.get(1).y, (int) resultPoints.get(2).y};
 
-        for (int vertexInPolygonInd = 1; vertexInPolygonInd < nVerticesInPolygon; ++vertexInPolygonInd) {
-            graphicsContext.strokeLine(
-                    resultPoints.get(vertexInPolygonInd - 1).x,
-                    resultPoints.get(vertexInPolygonInd - 1).y,
-                    resultPoints.get(vertexInPolygonInd).x,
-                    resultPoints.get(vertexInPolygonInd).y
-            );
-        }
+                TriangleRasterization.draw(
+                        graphicsContext,
+                        coorX,
+                        coorY,
+                        new Color[]{mesh.color, mesh.color, mesh.color},
+                        ZBuffer,
+                        vz,
+                        normals,
+                        textures,
+                        new double[]{viewMatrix.m02, viewMatrix.m12, viewMatrix.m22},
+                        mesh);
 
-        if (nVerticesInPolygon > 0) {
-            graphicsContext.strokeLine(
-                    resultPoints.get(nVerticesInPolygon - 1).x,
-                    resultPoints.get(nVerticesInPolygon - 1).y,
-                    resultPoints.get(0).x,
-                    resultPoints.get(0).y
-            );
+                if (mesh.isActiveGrid) {
+                    Greed.drawLine(coorX[0], coorY[0], coorX[1], coorY[1], ZBuffer, vz, coorX, coorY, graphicsContext);
+                    Greed.drawLine(coorX[0], coorY[0], coorX[2], coorY[2], ZBuffer, vz, coorX, coorY, graphicsContext);
+                    Greed.drawLine(coorX[2], coorY[2], coorX[1], coorY[1], ZBuffer, vz, coorX, coorY, graphicsContext);
+                }
+            }
         }
     }
 }
