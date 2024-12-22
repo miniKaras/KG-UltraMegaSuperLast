@@ -11,10 +11,12 @@ import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
 import javafx.stage.FileChooser;
 import javafx.util.Duration;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.io.IOException;
 import java.io.File;
+import java.util.ArrayList;
 import javax.vecmath.Vector3f;
 
 import com.cgvsu.model.Model;
@@ -36,7 +38,7 @@ public class GuiController {
     private Camera camera = new Camera(
             new Vector3f(0, 00, 100),
             new Vector3f(0, 0, 0),
-            1.0F, 1, 0.01F, 100);
+            1.0F, 1, 0.01F, 100,true);
 
     private Timeline timeline;
 
@@ -56,7 +58,9 @@ public class GuiController {
             camera.setAspectRatio((float) (width / height));
 
             if (mesh != null) {
-                RenderEngine.render(canvas.getGraphicsContext2D(), camera, mesh, (int) width, (int) height);
+                ArrayList<Model> modelArrayList = new ArrayList<>();
+                modelArrayList.add(mesh);
+                RenderEngine.render(canvas.getGraphicsContext2D(), camera, modelArrayList, (int) width, (int) height);
             }
         });
 
