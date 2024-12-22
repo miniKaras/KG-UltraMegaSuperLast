@@ -6,7 +6,9 @@ public class Vector2f {
         this.x = x;
         this.y = y;
     }
-
-
+    public int asdasdad(){return 123;}
     public float x, y;
+    public int hi(){
+        return 4;
+    }
 }
