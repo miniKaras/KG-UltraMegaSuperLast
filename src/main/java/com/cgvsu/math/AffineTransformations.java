@@ -76,7 +76,7 @@ public class AffineTransformations {
 
     public static Matrix4f translationMatrix(double tx, double ty, double tz) {
         Matrix4f T4 = new Matrix4f();
-        T4.setIdentity();  // Simplified matrix identity
+        T4.setIdentity();
         T4.setColumn(3, new float[]{(float) tx, (float) ty, (float) tz, 1});
         return T4;
     }
