@@ -5,6 +5,7 @@ import javax.vecmath.Matrix4f;
 
 public class Camera {
 
+    // Поля класса
     private Vector3f position;
     private Vector3f target;
     private float fov;
@@ -13,6 +14,7 @@ public class Camera {
     private float farPlane;
     private boolean isActive;
 
+    // Конструктор
     public Camera(
             final Vector3f position,
             final Vector3f target,
@@ -20,7 +22,8 @@ public class Camera {
             final float aspectRatio,
             final float nearPlane,
             final float farPlane,
-            final boolean isActive) {
+            final boolean isActive
+    ) {
         this.position = position;
         this.target = target;
         this.fov = fov;
@@ -30,6 +33,7 @@ public class Camera {
         this.isActive = isActive;
     }
 
+    // Сеттеры
     public void setPosition(final Vector3f position) {
         this.position = position;
     }
@@ -42,6 +46,11 @@ public class Camera {
         this.aspectRatio = aspectRatio;
     }
 
+    public void setActive(boolean active) {
+        isActive = active;
+    }
+
+    // Геттеры
     public Vector3f getPosition() {
         return position;
     }
@@ -54,10 +63,7 @@ public class Camera {
         return isActive;
     }
 
-    public void setActive(boolean active) {
-        isActive = active;
-    }
-
+    // Методы для перемещения
     public void movePosition(final Vector3f translation) {
         this.position.add(translation);
     }
@@ -66,11 +72,12 @@ public class Camera {
         this.target.add(translation);
     }
 
-    public Matrix4f getViewMatrix() {
+    // Получение матриц
+    Matrix4f getViewMatrix() {
         return GraphicConveyor.lookAt(position, target);
     }
 
-    public Matrix4f getProjectionMatrix() {
+    Matrix4f getProjectionMatrix() {
         return GraphicConveyor.perspective(fov, aspectRatio, nearPlane, farPlane);
     }
 }
