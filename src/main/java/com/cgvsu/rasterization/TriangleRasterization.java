@@ -1,5 +1,6 @@
 package com.cgvsu.rasterization;
 
+import com.cgvsu.checkbox.Greed;
 import com.cgvsu.checkbox.Lighting;
 import com.cgvsu.checkbox.Texture;
 import com.cgvsu.math.Vector2f;
@@ -9,7 +10,12 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.paint.Color;
 
+import static com.cgvsu.checkbox.Lighting.getGradientCoordinatesRGB;
+
 public class TriangleRasterization {
+
+    // Небольшая константа для сравнения с плавающей точкой
+    private static final double EPSILON = 1e-7;
 
     public static void draw(
             final GraphicsContext graphicsContext,
@@ -21,189 +27,220 @@ public class TriangleRasterization {
             Vector3f[] normals,
             Vector2f[] textures,
             double[] light,
-            Model mesh) {
-
+            Model mesh
+    ) {
         final PixelWriter pixelWriter = graphicsContext.getPixelWriter();
 
-        sortVertices(coordX, coordY, deepZ, normals, textures, color);
+        // Отсортируем вершины по оси Y
+        sort(coordX, coordY, deepZ, normals, textures, color);
 
-        rasterizeTriangle(graphicsContext, pixelWriter, coordX, coordY, color, zBuff, deepZ, normals, textures, light, mesh);
-    }
-    public static double determinator(int[][] arr) {
-        return arr[0][0] * arr[1][1] * arr[2][2] + arr[1][0] * arr[0][2] * arr[2][1] +
-                arr[0][1] * arr[1][2] * arr[2][0] - arr[0][2] * arr[1][1] * arr[2][0] -
-                arr[0][0] * arr[1][2] * arr[2][1] - arr[0][1] * arr[1][0] * arr[2][2];
-    }
-    public static double[] barizentricCoordinates(int x, int y, int[] arrX, int[] arrY) {
-        final double generalDeterminant = determinator(new int[][]{arrX, arrY, new int[]{1, 1, 1}});
-        final double alfa = Math.abs(determinator(
-                new int[][]{new int[]{x, arrX[1], arrX[2]}, new int[]{y, arrY[1], arrY[2]}, new int[]{1, 1, 1}}) /
-                generalDeterminant);
-        final double betta = Math.abs(determinator(
-                new int[][]{new int[]{arrX[0], x, arrX[2]}, new int[]{arrY[0], y, arrY[2]}, new int[]{1, 1, 1}}) /
-                generalDeterminant);
-        final double gamma = Math.abs(determinator(
-                new int[][]{new int[]{arrX[0], arrX[1], x}, new int[]{arrY[0], arrY[1], y}, new int[]{1, 1, 1}}) /
-                generalDeterminant);
-        return new double[]{alfa, betta, gamma};
-    }
+        // Отрисовка верхней части треугольника (между coordY[0] и coordY[1])
+        for (int y = coordY[0]; y <= coordY[1]; y++) {
+            // Линейная интерполяция X-координат
+            int xl = (coordY[1] - coordY[0] == 0)
+                    ? coordX[0]
+                    : (y - coordY[0]) * (coordX[1] - coordX[0]) / (coordY[1] - coordY[0]) + coordX[0];
+            int xr = (coordY[0] - coordY[2] == 0)
+                    ? coordX[2]
+                    : (y - coordY[2]) * (coordX[0] - coordX[2]) / (coordY[0] - coordY[2]) + coordX[2];
 
-    private static void rasterizeTriangle(
-            GraphicsContext graphicsContext,
-            PixelWriter pixelWriter,
-            int[] coordX,
-            int[] coordY,
-            Color[] color,
-            double[][] zBuff,
-            double[] deepZ,
-            Vector3f[] normals,
-            Vector2f[] textures,
-            double[] light,
-            Model mesh) {
-
-        rasterizeHalfTriangle(coordX, coordY, color, zBuff, deepZ, normals, textures, light, mesh, pixelWriter, coordY[0], coordY[1]);
-        rasterizeHalfTriangle(coordX, coordY, color, zBuff, deepZ, normals, textures, light, mesh, pixelWriter, coordY[1], coordY[2]);
-    }
-
-    private static void rasterizeHalfTriangle(
-            int[] coordX,
-            int[] coordY,
-            Color[] color,
-            double[][] zBuff,
-            double[] deepZ,
-            Vector3f[] normals,
-            Vector2f[] textures,
-            double[] light,
-            Model mesh,
-            PixelWriter pixelWriter,
-            int startY,
-            int endY) {
-
-        for (int y = startY; y <= endY; y++) {
-            int xl = interpolateEdge(y, coordY[0], coordY[1], coordX[0], coordX[1]);
-            int xr = interpolateEdge(y, coordY[0], coordY[2], coordX[0], coordX[2]);
-
+            // Убедимся, что xl <= xr
             if (xl > xr) {
-                int temp = xl;
+                int tempX = xl;
                 xl = xr;
-                xr = temp;
+                xr = tempX;
             }
 
-            fillScanline(xl, xr, y, coordX, coordY, color, zBuff, deepZ, normals, textures, light, mesh, pixelWriter);
+            // Проходимся по X
+            for (int x = xl; x <= xr; x++) {
+                if (x >= 0 && y >= 0 && x < zBuff.length && y < zBuff[0].length) {
+                    double[] barizentric = barizentricCoordinates(x, y, coordX, coordY);
+
+                    // Проверяем NaN и сумму барицентрических координат
+                    if (!Double.isNaN(barizentric[0])
+                            && !Double.isNaN(barizentric[1])
+                            && !Double.isNaN(barizentric[2])
+                            && Math.abs(barizentric[0] + barizentric[1] + barizentric[2] - 1) < EPSILON) {
+
+                        double zNew = interpolateCoordinatesZBuffer(barizentric, deepZ);
+
+                        // Проверяем Z-буфер
+                        if (zBuff[x][y] <= zNew) {
+                            continue;
+                        }
+
+                        // Расчёт цвета по градиенту
+                        int[] rgb = getGradientCoordinatesRGB(barizentric, color);
+
+                        // Если включена текстура, применяем её
+                        if (mesh.isActiveTexture) {
+                            Texture.texture(barizentric, textures, mesh, rgb);
+                        }
+
+                        // Если включено освещение, рассчитываем свет
+                        if (mesh.isActiveLighting) {
+                            Lighting.light(barizentric, normals, light, rgb);
+                        }
+
+                        zBuff[x][y] = zNew;
+                        pixelWriter.setColor(x, y, Color.rgb(rgb[0], rgb[1], rgb[2]));
+                    }
+                }
+            }
         }
-    }
 
-    private static int interpolateEdge(int y, int y0, int y1, int x0, int x1) {
-        return (y1 - y0 == 0) ? x0 : (y - y0) * (x1 - x0) / (y1 - y0) + x0;
-    }
+        // Отрисовка нижней части треугольника (между coordY[1] и coordY[2])
+        for (int y = coordY[1]; y <= coordY[2]; y++) {
+            int xl = (coordY[2] - coordY[1] == 0)
+                    ? coordX[1]
+                    : (y - coordY[1]) * (coordX[2] - coordX[1]) / (coordY[2] - coordY[1]) + coordX[1];
+            int xr = (coordY[0] - coordY[2] == 0)
+                    ? coordX[2]
+                    : (y - coordY[2]) * (coordX[0] - coordX[2]) / (coordY[0] - coordY[2]) + coordX[2];
 
-    private static void fillScanline(
-            int xl,
-            int xr,
-            int y,
-            int[] coordX,
-            int[] coordY,
-            Color[] color,
-            double[][] zBuff,
-            double[] deepZ,
-            Vector3f[] normals,
-            Vector2f[] textures,
-            double[] light,
-            Model mesh,
-            PixelWriter pixelWriter) {
+            if (xl > xr) {
+                int tempX = xl;
+                xl = xr;
+                xr = tempX;
+            }
 
-        for (int x = xl; x <= xr; x++) {
-            if (isWithinBounds(x, y, zBuff)) {
-                double[] barycentric = calculateBarycentricCoordinates(x, y, coordX, coordY);
+            for (int x = xl; x <= xr; x++) {
+                if (x >= 0 && y >= 0 && x < zBuff.length && y < zBuff[0].length) {
+                    double[] barizentric = barizentricCoordinates(x, y, coordX, coordY);
 
-                if (isValidBarycentric(barycentric)) {
-                    double zNew = interpolateCoordinatesZBuffer(barycentric, deepZ);
+                    if (!Double.isNaN(barizentric[0])
+                            && !Double.isNaN(barizentric[1])
+                            && !Double.isNaN(barizentric[2])
+                            && Math.abs(barizentric[0] + barizentric[1] + barizentric[2] - 1) < EPSILON) {
 
-                    if (zBuff[x][y] <= zNew) {
-                        continue;
+                        double zNew = interpolateCoordinatesZBuffer(barizentric, deepZ);
+                        if (zBuff[x][y] <= zNew) {
+                            continue;
+                        }
+
+                        int[] rgb = getGradientCoordinatesRGB(barizentric, color);
+                        if (mesh.isActiveTexture) {
+                            Texture.texture(barizentric, textures, mesh, rgb);
+                        }
+                        if (mesh.isActiveLighting) {
+                            Lighting.light(barizentric, normals, light, rgb);
+                        }
+
+                        zBuff[x][y] = zNew;
+                        pixelWriter.setColor(x, y, Color.rgb(rgb[0], rgb[1], rgb[2]));
                     }
-
-                    int[] rgb = Lighting.getGradientCoordinatesRGB(barycentric, color);
-
-                    if (mesh.isActiveTexture) {
-                        Texture.applyTexture(barycentric, textures, mesh, rgb);
-                    }
-
-                    if (mesh.isActiveLighting) {
-                        Lighting.light(barycentric, normals, light, rgb);
-                    }
-
-                    zBuff[x][y] = zNew;
-                    pixelWriter.setColor(x, y, Color.rgb(rgb[0], rgb[1], rgb[2]));
                 }
             }
         }
     }
 
-    private static boolean isWithinBounds(int x, int y, double[][] zBuff) {
-        return x >= 0 && y >= 0 && x < zBuff.length && y < zBuff[0].length;
+    public static double determinator(int[][] arr) {
+        // Вычисляем определитель 3x3
+        return arr[0][0] * arr[1][1] * arr[2][2]
+                + arr[1][0] * arr[0][2] * arr[2][1]
+                + arr[0][1] * arr[1][2] * arr[2][0]
+                - arr[0][2] * arr[1][1] * arr[2][0]
+                - arr[0][0] * arr[1][2] * arr[2][1]
+                - arr[0][1] * arr[1][0] * arr[2][2];
     }
 
-    private static boolean isValidBarycentric(double[] barycentric) {
-        return !Double.isNaN(barycentric[0]) &&
-                !Double.isNaN(barycentric[1]) &&
-                !Double.isNaN(barycentric[2]) &&
-                Math.abs(barycentric[0] + barycentric[1] + barycentric[2] - 1) < 1e-7f;
+    public static double[] barizentricCoordinates(int x, int y, int[] arrX, int[] arrY) {
+        // Общий определитель
+        final double generalDeterminant = determinator(
+                new int[][]{arrX, arrY, new int[]{1, 1, 1}}
+        );
+
+        // Коэффициенты (alfa, betta, gamma)
+        final double alfa = Math.abs(
+                determinator(new int[][]{
+                        new int[]{x,      arrX[1], arrX[2]},
+                        new int[]{y,      arrY[1], arrY[2]},
+                        new int[]{1,           1,      1}
+                }) / generalDeterminant
+        );
+        final double betta = Math.abs(
+                determinator(new int[][]{
+                        new int[]{arrX[0], x,      arrX[2]},
+                        new int[]{arrY[0], y,      arrY[2]},
+                        new int[]{1,           1,      1}
+                }) / generalDeterminant
+        );
+        final double gamma = Math.abs(
+                determinator(new int[][]{
+                        new int[]{arrX[0], arrX[1], x},
+                        new int[]{arrY[0], arrY[1], y},
+                        new int[]{1,           1,      1}
+                }) / generalDeterminant
+        );
+
+        return new double[]{alfa, betta, gamma};
     }
 
-    public static double interpolateCoordinatesZBuffer(final double[] barycentricCoords, final double[] deepZ) {
-        return barycentricCoords[0] * deepZ[0] + barycentricCoords[1] * deepZ[1] + barycentricCoords[2] * deepZ[2];
-    }
-
-    public static double[] calculateBarycentricCoordinates(int x, int y, int[] coordX, int[] coordY) {
-        double generalDet = determinant(new int[][] { coordX, coordY, new int[] { 1, 1, 1 } });
-        double alpha = Math.abs(determinant(new int[][] { new int[] { x, coordX[1], coordX[2] }, new int[] { y, coordY[1], coordY[2] }, new int[] { 1, 1, 1 } }) / generalDet);
-        double beta = Math.abs(determinant(new int[][] { new int[] { coordX[0], x, coordX[2] }, new int[] { coordY[0], y, coordY[2] }, new int[] { 1, 1, 1 } }) / generalDet);
-        double gamma = Math.abs(determinant(new int[][] { new int[] { coordX[0], coordX[1], x }, new int[] { coordY[0], coordY[1], y }, new int[] { 1, 1, 1 } }) / generalDet);
-
-        return new double[] { alpha, beta, gamma };
-    }
-
-    private static double determinant(int[][] matrix) {
-        return matrix[0][0] * matrix[1][1] * matrix[2][2] + matrix[1][0] * matrix[0][2] * matrix[2][1] + matrix[0][1] * matrix[1][2] * matrix[2][0]
-                - matrix[0][2] * matrix[1][1] * matrix[2][0] - matrix[0][0] * matrix[1][2] * matrix[2][1] - matrix[0][1] * matrix[1][0] * matrix[2][2];
-    }
-
-    public static void sortVertices(int[] coordX, int[] coordY, double[] deepZ, Vector3f[] normals, Vector2f[] textures, Color[] color) {
+    public static void sort(
+            int[] coordX,
+            int[] coordY,
+            double[] deepZ,
+            Vector3f[] normals,
+            Vector2f[] textures,
+            Color[] color
+    ) {
+        // Тройная проверка для сортировки
         if (coordY[0] > coordY[1]) {
-            swap(0, 1, coordX, coordY, deepZ, normals, textures, color);
+            reverse(0, 1, coordX, coordY, deepZ, normals, textures, color);
         }
         if (coordY[0] > coordY[2]) {
-            swap(0, 2, coordX, coordY, deepZ, normals, textures, color);
+            reverse(0, 2, coordX, coordY, deepZ, normals, textures, color);
         }
         if (coordY[1] > coordY[2]) {
-            swap(1, 2, coordX, coordY, deepZ, normals, textures, color);
+            reverse(1, 2, coordX, coordY, deepZ, normals, textures, color);
         }
     }
 
-    private static void swap(int i, int j, int[] coordX, int[] coordY, double[] deepZ, Vector3f[] normals, Vector2f[] textures, Color[] color) {
+    private static void reverse(
+            int i,
+            int j,
+            int[] coordX,
+            int[] coordY,
+            double[] deepZ,
+            Vector3f[] normals,
+            Vector2f[] textures,
+            Color[] color
+    ) {
+        // Меняем местами Y
         int tempY = coordY[i];
         coordY[i] = coordY[j];
         coordY[j] = tempY;
 
+        // Меняем местами X
         int tempX = coordX[i];
         coordX[i] = coordX[j];
         coordX[j] = tempX;
 
-        double tempZ = deepZ[i];
-        deepZ[i] = deepZ[j];
-        deepZ[j] = tempZ;
-
-        Color tempColor = color[i];
+        // Меняем местами цвета
+        Color colorTemp = color[i];
         color[i] = color[j];
-        color[j] = tempColor;
+        color[j] = colorTemp;
 
-        Vector3f tempNormal = normals[i];
+        // Меняем местами глубину Z
+        double zBuf = deepZ[i];
+        deepZ[i] = deepZ[j];
+        deepZ[j] = zBuf;
+
+        // Меняем местами нормали
+        Vector3f normal = normals[i];
         normals[i] = normals[j];
-        normals[j] = tempNormal;
+        normals[j] = normal;
 
-        Vector2f tempTexture = textures[i];
+        // Меняем местами текстурные координаты
+        Vector2f texture = textures[i];
         textures[i] = textures[j];
-        textures[j] = tempTexture;
+        textures[j] = texture;
+    }
+
+    public static double interpolateCoordinatesZBuffer(final double[] baristicCoords, final double[] deepZ) {
+        // Вычисляем Z путём линейной комбинации
+        return baristicCoords[0] * deepZ[0]
+                + baristicCoords[1] * deepZ[1]
+                + baristicCoords[2] * deepZ[2];
     }
 }
