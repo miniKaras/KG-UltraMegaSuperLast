@@ -4,8 +4,8 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.paint.Color;
 
-import static com.cgvsu.rasterization.TriangleRasterization.barizentricCoordinates;
 import static com.cgvsu.rasterization.TriangleRasterization.interpolateCoordinatesZBuffer;
+import static com.cgvsu.triangulation.Triangulation.barizentricCoordinates;
 
 public class Greed {
 
