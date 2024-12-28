@@ -1,0 +1,9 @@
+.root {
+    -fx-base: #333333;
+    -fx-background: #333333;
+    -fx-fill: #ffffff;
+    -fx-text-fill:white;
+}
+.text-field {
+    -fx-prompt-text-fill: white;
+}
