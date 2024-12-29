@@ -13,6 +13,8 @@ public class Camera {
     private float nearPlane;
     private float farPlane;
     private boolean isActive;
+    private float yaw = 0.0f;
+    private float pitch = 0.0f;
 
     // Конструктор
     public Camera(
@@ -79,5 +81,22 @@ public class Camera {
 
     Matrix4f getProjectionMatrix() {
         return GraphicConveyor.perspective(fov, aspectRatio, nearPlane, farPlane);
+    }
+
+    public void rotateCamera(float pitchDelta, float yawDelta) {
+        this.pitch += pitchDelta;
+        this.yaw += yawDelta;
+        this.pitch = Math.max(-89.0f, Math.min(89.0f, this.pitch));
+        float cosPitch = (float) Math.cos(Math.toRadians(pitch));
+        float sinPitch = (float) Math.sin(Math.toRadians(pitch));
+        float cosYaw = (float) Math.cos(Math.toRadians(yaw));
+        float sinYaw = (float) Math.sin(Math.toRadians(yaw));
+        Vector3f direction = new Vector3f(
+                cosYaw * cosPitch, sinPitch,
+                sinYaw * cosPitch);
+        direction.normalize();
+        target.set(
+                position.x + direction.x, position.y + direction.y,
+                position.z + direction.z);
     }
 }

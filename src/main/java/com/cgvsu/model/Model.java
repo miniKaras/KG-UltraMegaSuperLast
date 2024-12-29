@@ -8,6 +8,7 @@ import com.cgvsu.triangulation.Triangulation;
 
 import javafx.scene.paint.Color;
 
+import javax.vecmath.Matrix4f;
 import java.util.ArrayList;
 
 public class Model {
@@ -24,6 +25,19 @@ public class Model {
     public boolean isActiveLighting = false;
     public Color color = Color.GRAY;
     public ImageToText imageToText = null;
+    private Matrix4f transformMatrix = new Matrix4f();
+
+    public Model() {
+        transformMatrix.setIdentity();
+    }
+
+    public Matrix4f getTransformMatrix() {
+        return transformMatrix;
+    }
+
+    public void setTransformMatrix(Matrix4f transformMatrix) {
+        this.transformMatrix = transformMatrix;
+    }
 
     public void triangulate() {
         polygonsWithoutTriangulation = polygons;

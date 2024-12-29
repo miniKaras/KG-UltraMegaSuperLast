@@ -18,7 +18,7 @@
             <items>
                 <ScrollPane onKeyPressed="#moveCamera" onKeyReleased="#moveCamera" onKeyTyped="#moveCamera" prefHeight="200.0" prefWidth="200.0">
                     <content>
-                        <Canvas fx:id="canvas" height="889.0" onKeyPressed="#moveCamera" onKeyReleased="#moveCamera" onKeyTyped="#moveCamera" width="346.0" />
+                        <Canvas fx:id="canvas" height="889.0" onKeyPressed="#moveCamera" onKeyReleased="#moveCamera" onKeyTyped="#moveCamera" width="346.0" onMousePressed="#handleMousePress" onMouseDragged="#handleMouseDrag" onMouseReleased="#handleMouseRelease" onScroll="#handleScroll"/>
                     </content>
                 </ScrollPane>
                 <ScrollPane prefHeight="1.0" prefWidth="1.0">
