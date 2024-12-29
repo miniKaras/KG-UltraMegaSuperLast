@@ -7,7 +7,7 @@ public class Vector4f {
         this.z = z;
         this.w = w;
     }
-
+    public Vector4f(){}
     public boolean equals(Vector4f other) {
         final float eps = 1e-7f;
         return Math.abs(x - other.x) < eps && Math.abs(y - other.y) < eps && Math.abs(z - other.z) < eps && Math.abs(w - other.w) < eps;

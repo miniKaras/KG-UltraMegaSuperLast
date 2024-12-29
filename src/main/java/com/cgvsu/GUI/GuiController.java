@@ -1,5 +1,7 @@
 package com.cgvsu.GUI;
 
+import com.cgvsu.math.AffineTransformations;
+import com.cgvsu.math.TranslationModel;
 import com.cgvsu.render_engine.RenderEngine;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
@@ -13,6 +15,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
@@ -25,6 +28,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import javax.vecmath.Matrix4f;
 import javax.vecmath.Vector3f;
 
 import com.cgvsu.model.Model;
@@ -52,6 +56,12 @@ public class GuiController {
     public Button convert;
     public TextField deleteVertex;
     public Button deleteVertexButton;
+    //вращение
+    private boolean isMousePressedForModel = false;
+    private double lastMouseXForModel;
+    private double lastMouseYForModel;
+    private double rotationSensitivity = 0.5;
+    private final float zoomSpeed = 0.5f;
 
     Alert messageWarning = new Alert(Alert.AlertType.WARNING);
     Alert messageError = new Alert(Alert.AlertType.ERROR);
@@ -497,4 +507,55 @@ public class GuiController {
             showMessage("Ошибка", ex.getMessage(), messageError);
         }
     }
+
+    @FXML
+    public void handleMousePress(MouseEvent event) {
+        if (event.isPrimaryButtonDown()) {
+            isMousePressedForModel = true;
+            lastMouseXForModel = event.getSceneX();
+            lastMouseYForModel = event.getSceneY();
+        }
+
+        // После клика мышью захватываем фокус (чтобы хоткеи работали)
+        canvas.requestFocus();
+    }
+
+    @FXML
+    public void handleMouseDrag(MouseEvent event) {
+        if (isMousePressedForModel) {
+            double currentX = event.getSceneX();
+            double currentY = event.getSceneY();
+
+            double deltaX = currentX - lastMouseXForModel;
+            double deltaY = currentY - lastMouseYForModel;
+
+            float angleY = (float) (deltaX* rotationSensitivity * 0.01);
+            float angleX = (float) (deltaY * rotationSensitivity * 0.01);
+
+            Matrix4f rotationMatrix = AffineTransformations.rotationMatrix(angleX, -angleY, 0);
+            Model model = scene.getActiveModel();
+            if (model != null) {
+                TranslationModel.move(rotationMatrix, model);
+            }
+
+            lastMouseXForModel = currentX;
+            lastMouseYForModel = currentY;
+        }
+    }
+
+    @FXML
+    public void handleMouseRelease(MouseEvent event) {
+        // Отпускаем левую кнопку
+        if (isMousePressedForModel && event.isPrimaryButtonDown() == false) {
+            isMousePressedForModel = false;
+        }
+    }
+
+    @FXML
+    public void handleScroll(ScrollEvent event) {
+        float zoom = (float) event.getDeltaY() * zoomSpeed;
+        activeCamera().movePosition(new Vector3f(0, 0, -zoom));
+    }
+
+
 }
